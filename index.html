@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Way Home · Pyrmont</title>
+<style>
+  :root{
+    --ink:#0B2540;
+    --sky:#00A9CE;      /* TfNSW-style train/ferry blue */
+    --teal:#007E7A;     /* ferry teal */
+    --paper:#F5F7F6;
+    --line:#0B2540;
+    --amber:#E4A400;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    background:var(--paper);
+    font-family:'Helvetica Neue', Arial, sans-serif;
+    color:var(--ink);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-start;
+  }
+
+  /* Wayfinding header strip, like a station sign */
+  .sign{
+    width:100%;
+    background:var(--sky);
+    color:#fff;
+    padding:22px 20px 18px;
+    position:relative;
+    overflow:hidden;
+  }
+  .sign::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:0;
+    height:8px;
+    background:repeating-linear-gradient(
+      90deg,
+      var(--amber) 0 24px,
+      transparent 24px 48px
+    );
+  }
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    opacity:.85;
+    font-weight:700;
+  }
+  h1{
+    margin:6px 0 0;
+    font-size:clamp(30px, 8vw, 40px);
+    font-weight:800;
+    letter-spacing:-0.01em;
+    line-height:1.05;
+  }
+  .dest{
+    margin-top:10px;
+    font-size:15px;
+    font-weight:600;
+    opacity:.95;
+  }
+
+  main{
+    width:100%;
+    max-width:480px;
+    padding:28px 20px 40px;
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    flex:1;
+  }
+
+  .status{
+    border:2px solid var(--ink);
+    border-radius:2px;
+    padding:16px 18px;
+    background:#fff;
+    font-size:15px;
+    line-height:1.5;
+    min-height:64px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .dot{
+    width:10px; height:10px;
+    border-radius:50%;
+    background:#B7BEC2;
+    flex:0 0 auto;
+  }
+  .dot.live{ background:var(--teal); }
+  .dot.err{ background:#C0392B; }
+
+  button{
+    appearance:none;
+    border:none;
+    background:var(--ink);
+    color:#fff;
+    font-family:inherit;
+    font-weight:800;
+    font-size:20px;
+    letter-spacing:.01em;
+    padding:22px 20px;
+    border-radius:2px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    transition:background .15s ease, transform .05s ease;
+  }
+  button:active{ transform:scale(0.98); }
+  button:hover{ background:#153055; }
+  button:disabled{ background:#9AA5AC; cursor:progress; }
+  .arrow{ font-size:22px; }
+
+  .modebtn{
+    background:#fff;
+    color:var(--ink);
+    border:2px solid var(--ink);
+    font-weight:700;
+    font-size:15px;
+    padding:14px 16px;
+  }
+  .modebtn:hover{ background:#eef2f1; }
+
+  .busbtn{
+    background:var(--teal);
+    color:#fff;
+    border:none;
+    font-weight:800;
+    font-size:17px;
+    padding:18px 20px;
+    border-radius:2px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .busbtn:hover{ background:#00655F; }
+  .busbtn:active{ transform:scale(0.98); }
+
+  .board{
+    border:2px solid var(--ink);
+    border-radius:2px;
+    background:#fff;
+    padding:16px 18px;
+    display:none;
+  }
+  .board.show{ display:block; }
+  .board-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .board-title{
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    font-weight:700;
+    color:#5B6A72;
+  }
+  .board-stop{
+    font-size:14px;
+    font-weight:700;
+    color:var(--ink);
+  }
+  .board-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 0;
+    border-top:1px solid #E4E9EA;
+  }
+  .board-row:first-of-type{ border-top:none; }
+  .board-line{
+    background:var(--teal);
+    color:#fff;
+    font-weight:800;
+    font-size:13px;
+    border-radius:3px;
+    padding:4px 8px;
+    min-width:34px;
+    text-align:center;
+    flex:0 0 auto;
+  }
+  .board-dest{
+    flex:1;
+    font-size:14px;
+    font-weight:600;
+    color:var(--ink);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .board-mins{
+    font-size:15px;
+    font-weight:800;
+    color:var(--ink);
+    flex:0 0 auto;
+  }
+  .board-mins.live{ color:var(--teal); }
+  .board-empty{
+    font-size:14px;
+    color:#5B6A72;
+    padding:6px 0;
+  }
+  .board-error{
+    font-size:13px;
+    color:#C0392B;
+    padding:6px 0;
+    line-height:1.5;
+  }
+
+  footer{
+    margin-top:auto;
+    padding:18px 20px 26px;
+    font-size:12px;
+    color:#5B6A72;
+    text-align:center;
+  }
+
+  .legend{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    font-size:12px;
+    color:#5B6A72;
+  }
+  .chip{
+    border:1px solid #C6CFD2;
+    border-radius:999px;
+    padding:4px 10px;
+  }
+
+  .weather{
+    border:2px solid var(--ink);
+    border-radius:2px;
+    background:#fff;
+    padding:16px 18px;
+    display:none;
+  }
+  .weather.show{ display:block; }
+  .weather-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .weather-title{
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    font-weight:700;
+    color:#5B6A72;
+  }
+  .weather-now{
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .weather-icon{ font-size:34px; line-height:1; }
+  .weather-temp{
+    font-size:32px;
+    font-weight:800;
+    line-height:1;
+  }
+  .weather-desc{
+    font-size:14px;
+    color:#5B6A72;
+    margin-top:2px;
+  }
+  .weather-strip{
+    display:flex;
+    gap:6px;
+    margin-top:14px;
+    overflow-x:auto;
+    padding-bottom:2px;
+  }
+  .weather-slot{
+    flex:1 0 auto;
+    min-width:52px;
+    text-align:center;
+    border-left:1px solid #E4E9EA;
+    padding-left:6px;
+  }
+  .weather-slot:first-child{ border-left:none; padding-left:0; }
+  .weather-slot .t{ font-size:11px; color:#5B6A72; }
+  .weather-slot .icn{ font-size:18px; margin:3px 0; }
+  .weather-slot .deg{ font-size:13px; font-weight:700; }
+  .weather-rain{
+    font-size:11px;
+    color:var(--sky);
+    font-weight:700;
+  }
+</style>
+</head>
+<body>
+
+  <div class="sign">
+    <div class="eyebrow">Way&nbsp;Home</div>
+    <h1>Get me to<br>Pyrmont</h1>
+    <div class="dest">2–4 Mount Street Walk, Pyrmont NSW</div>
+  </div>
+
+  <main>
+    <div class="status" id="status">
+      <span class="dot" id="dot"></span>
+      <span id="statusText">Tap below to find the best way home.</span>
+    </div>
+
+    <button id="goBtn">
+      <span id="goLabel">Find my route</span>
+      <span class="arrow">→</span>
+    </button>
+
+    <button class="modebtn" id="modeBtn">Mode: Transit (train / bus / ferry)</button>
+
+    <button class="busbtn" id="busBtn">
+      <span>Check next departures</span>
+      <span class="arrow">→</span>
+    </button>
+
+    <div class="board" id="board">
+      <div class="board-head">
+        <span class="board-title">Next departures</span>
+        <span class="board-stop" id="boardStop"></span>
+      </div>
+      <div id="boardBody">
+        <div class="board-empty">Loading…</div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span class="chip">Uses your live location</span>
+      <span class="chip">Opens in Google Maps</span>
+    </div>
+
+    <div class="weather" id="weather">
+      <div class="weather-head">
+        <span class="weather-title">Next hour</span>
+        <span class="weather-title" id="weatherPlace"></span>
+      </div>
+      <div class="weather-now">
+        <span class="weather-icon" id="weatherIcon">—</span>
+        <div>
+          <div class="weather-temp" id="weatherTemp">—°</div>
+          <div class="weather-desc" id="weatherDesc">Getting forecast…</div>
+        </div>
+      </div>
+      <div class="weather-strip" id="weatherStrip"></div>
+    </div>
+  </main>
+
+  <footer>
+    Location is used only in this browser, once, to build the directions link. Nothing is stored.
+  </footer>
+
+<script>
+  const HOME = "2-4 Mount Street Walk, Pyrmont NSW 2009, Australia";
+  const modes = [
+    { key: "transit", label: "Mode: Transit (train / bus / ferry)" },
+    { key: "walking", label: "Mode: Walking" },
+    { key: "driving", label: "Mode: Driving" },
+    { key: "bicycling", label: "Mode: Cycling" }
+  ];
+  let modeIndex = 0;
+
+  const statusEl = document.getElementById('statusText');
+  const dot = document.getElementById('dot');
+  const goBtn = document.getElementById('goBtn');
+  const goLabel = document.getElementById('goLabel');
+  const modeBtn = document.getElementById('modeBtn');
+  const busBtn = document.getElementById('busBtn');
+
+  const board = document.getElementById('board');
+  const boardStop = document.getElementById('boardStop');
+  const boardBody = document.getElementById('boardBody');
+
+  busBtn.addEventListener('click', () => {
+    if(!navigator.geolocation){
+      board.classList.add('show');
+      boardBody.innerHTML = '<div class="board-error">This browser can\'t share location, so live departures aren\'t available.</div>';
+      return;
+    }
+
+    const originalLabel = busBtn.querySelector('span').textContent;
+    busBtn.querySelector('span').textContent = 'Locating…';
+    busBtn.disabled = true;
+    board.classList.add('show');
+    boardBody.innerHTML = '<div class="board-empty">Loading…</div>';
+    boardStop.textContent = '';
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        busBtn.querySelector('span').textContent = originalLabel;
+        busBtn.disabled = false;
+        await loadDepartures(latitude, longitude);
+      },
+      () => {
+        busBtn.querySelector('span').textContent = originalLabel;
+        busBtn.disabled = false;
+        boardBody.innerHTML = '<div class="board-error">Couldn\'t get your location, so live departures aren\'t available. Check location permissions and try again.</div>';
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  });
+
+  async function loadDepartures(lat, lon){
+    try{
+      const res = await fetch(`/.netlify/functions/nextbus?lat=${lat}&lon=${lon}`);
+      const data = await res.json();
+
+      if(!res.ok || data.error){
+        boardBody.innerHTML = `<div class="board-error">${data.error || 'Could not load departures right now.'}${data.detail ? '<br>' + escapeHtml(data.detail) : ''}</div>`;
+        return;
+      }
+
+      boardStop.textContent = data.stopName || '';
+
+      if(!data.departures || data.departures.length === 0){
+        boardBody.innerHTML = '<div class="board-empty">No upcoming departures found for this stop right now.</div>';
+        return;
+      }
+
+      boardBody.innerHTML = data.departures.map(d => {
+        const mins = d.minutes === null ? '—' : (d.minutes <= 0 ? 'Now' : d.minutes + ' min');
+        return `
+          <div class="board-row">
+            <span class="board-line">${escapeHtml(d.line)}</span>
+            <span class="board-dest">${escapeHtml(d.mode)} · ${escapeHtml(d.destination)}</span>
+            <span class="board-mins ${d.realtime ? 'live' : ''}">${mins}</span>
+          </div>
+        `;
+      }).join('');
+    }catch(e){
+      boardBody.innerHTML = '<div class="board-error">Could not reach the departure service. It may still be starting up, or the API key may not be configured yet.</div>';
+    }
+  }
+
+  function escapeHtml(str){
+    if(str === undefined || str === null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  modeBtn.addEventListener('click', () => {
+    modeIndex = (modeIndex + 1) % modes.length;
+    modeBtn.textContent = modes[modeIndex].label;
+  });
+
+  function setStatus(text, state){
+    statusEl.textContent = text;
+    dot.className = 'dot' + (state ? ' ' + state : '');
+  }
+
+  goBtn.addEventListener('click', () => {
+    if(!navigator.geolocation){
+      setStatus("This browser can't share location. Opening directions without a start point.", 'err');
+      openMaps(null);
+      return;
+    }
+
+    goBtn.disabled = true;
+    goLabel.textContent = "Locating…";
+    setStatus("Finding your location…");
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setStatus("Location found. Opening your route…", 'live');
+        goLabel.textContent = "Find my route";
+        goBtn.disabled = false;
+        openMaps(`${latitude},${longitude}`);
+      },
+      (err) => {
+        goLabel.textContent = "Find my route";
+        goBtn.disabled = false;
+        setStatus("Couldn't get your location (" + err.message + "). Opening directions — you can set your start point in Maps.", 'err');
+        openMaps(null);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  });
+
+  const WMO = {
+    0:['☀️','Clear sky'], 1:['🌤️','Mostly clear'], 2:['⛅','Partly cloudy'], 3:['☁️','Overcast'],
+    45:['🌫️','Fog'], 48:['🌫️','Fog'],
+    51:['🌦️','Light drizzle'], 53:['🌦️','Drizzle'], 55:['🌧️','Dense drizzle'],
+    61:['🌧️','Light rain'], 63:['🌧️','Rain'], 65:['🌧️','Heavy rain'],
+    71:['🌨️','Light snow'], 73:['🌨️','Snow'], 75:['❄️','Heavy snow'],
+    80:['🌦️','Rain showers'], 81:['🌧️','Rain showers'], 82:['⛈️','Violent showers'],
+    95:['⛈️','Thunderstorm'], 96:['⛈️','Thunderstorm, hail'], 99:['⛈️','Thunderstorm, hail']
+  };
+
+  function describe(code){
+    return WMO[code] || ['🌡️','—'];
+  }
+
+  async function loadWeather(lat, lon){
+    const weatherBox = document.getElementById('weather');
+    try{
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,precipitation_probability,weathercode&forecast_hours=6&timezone=auto`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      const h = data.hourly;
+      const [icon0, desc0] = describe(h.weathercode[0]);
+
+      document.getElementById('weatherIcon').textContent = icon0;
+      document.getElementById('weatherTemp').textContent = Math.round(h.temperature_2m[0]) + '°';
+      document.getElementById('weatherDesc').textContent = desc0 +
+        (h.precipitation_probability[0] > 0 ? ` · ${h.precipitation_probability[0]}% rain` : '');
+      document.getElementById('weatherPlace').textContent = 'Your location';
+
+      const strip = document.getElementById('weatherStrip');
+      strip.innerHTML = '';
+      const now = new Date();
+      for(let i = 0; i < Math.min(6, h.time.length); i++){
+        const t = new Date(h.time[i]);
+        const [icn] = describe(h.weathercode[i]);
+        const slot = document.createElement('div');
+        slot.className = 'weather-slot';
+        slot.innerHTML = `
+          <div class="t">${i === 0 ? 'Now' : t.getHours() + ':00'}</div>
+          <div class="icn">${icn}</div>
+          <div class="deg">${Math.round(h.temperature_2m[i])}°</div>
+          <div class="weather-rain">${h.precipitation_probability[i]}%</div>
+        `;
+        strip.appendChild(slot);
+      }
+
+      weatherBox.classList.add('show');
+    }catch(e){
+      weatherBox.classList.remove('show');
+    }
+  }
+
+  // Try to load weather automatically on open, using the same location permission.
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      (pos) => loadWeather(pos.coords.latitude, pos.coords.longitude),
+      () => { /* silently skip weather if permission denied */ },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  }
+
+  function openMaps(origin){
+    const dest = encodeURIComponent(HOME);
+    const mode = modes[modeIndex].key;
+    let url = `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=${mode}`;
+    if(origin){
+      url += `&origin=${encodeURIComponent(origin)}`;
+    }
+    if(mode === 'transit'){
+      url += `&transit_routing_preference=less_walking`;
+    }
+    window.open(url, '_blank');
+  }
+</script>
+
+</body>
+</html>

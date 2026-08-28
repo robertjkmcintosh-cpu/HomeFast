@@ -173,12 +173,17 @@
   }
   .board-row{
     display:flex;
-    align-items:center;
-    gap:10px;
-    padding:10px 0;
+    flex-direction:column;
+    gap:6px;
+    padding:12px 0;
     border-top:1px solid #E4E9EA;
   }
   .board-row:first-of-type{ border-top:none; }
+  .board-row-top{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
   .board-line{
     background:var(--teal);
     color:#fff;
@@ -206,6 +211,11 @@
     flex:0 0 auto;
   }
   .board-mins.live{ color:var(--teal); }
+  .board-row-sub{
+    font-size:12px;
+    color:#5B6A72;
+    padding-left:44px;
+  }
   .board-empty{
     font-size:14px;
     color:#5B6A72;
@@ -423,7 +433,9 @@
         return;
       }
 
-      boardStop.textContent = data.stopName || '';
+      boardStop.innerHTML = data.stopName
+        ? `<a href="${mapsLinkFor(data)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">${escapeHtml(data.stopName)}</a>`
+        : '';
 
       if(!data.departures || data.departures.length === 0){
         boardBody.innerHTML = '<div class="board-empty">No upcoming departures found for this stop right now.</div>';
@@ -432,17 +444,37 @@
 
       boardBody.innerHTML = data.departures.map(d => {
         const mins = d.minutes === null ? '—' : (d.minutes <= 0 ? 'Now' : d.minutes + ' min');
+        const clockTime = d.departureTime
+          ? new Date(d.departureTime).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })
+          : '';
+        const subParts = [];
+        if(clockTime) subParts.push(`Departs ${clockTime}`);
+        if(d.platform) subParts.push(`from ${d.platform}`);
+        const subLine = subParts.join(' ');
+
         return `
           <div class="board-row">
-            <span class="board-line">${escapeHtml(d.line)}</span>
-            <span class="board-dest">${escapeHtml(d.mode)} · ${escapeHtml(d.destination)}</span>
-            <span class="board-mins ${d.realtime ? 'live' : ''}">${mins}</span>
+            <div class="board-row-top">
+              <span class="board-line">${escapeHtml(d.line)}</span>
+              <span class="board-dest">${escapeHtml(d.mode)} · ${escapeHtml(d.destination)}</span>
+              <span class="board-mins ${d.realtime ? 'live' : ''}">${mins}</span>
+            </div>
+            ${subLine ? `<div class="board-row-sub">${escapeHtml(subLine)}</div>` : ''}
           </div>
         `;
       }).join('');
     }catch(e){
       boardBody.innerHTML = '<div class="board-error">Could not reach the departure service. It may still be starting up, or the API key may not be configured yet.</div>';
     }
+  }
+
+  function mapsLinkFor(data){
+    if(data.stopCoord && data.stopCoord.length === 2){
+      const [a, b] = data.stopCoord;
+      // TfNSW coord order can vary; Google Maps accepts lat,lon.
+      return `https://www.google.com/maps/search/?api=1&query=${a},${b}`;
+    }
+    return `https://www.google.com/maps/search/${encodeURIComponent(data.stopName || 'bus stop')}`;
   }
 
   function escapeHtml(str){
